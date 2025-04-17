@@ -23,7 +23,9 @@ if not alerts:
 for alert in alerts:
     pkg = alert["dependency"]["package"]["name"]
     adv = alert["security_advisory"]
-    
+    # at the top of your loop, after `adv = alert["security_advisory"]`
+    manifest = alert["dependency"]["manifest_path"]  # e.g. "examples/celery/requirements.txt"
+
     # extract the safe version as before
     safe = extract_safe_version(adv)
     if not safe:
@@ -67,15 +69,40 @@ if not safe:
 
 print(f"Need to bump {pkg} → {safe}")
 # ---------------------------------------------------------------
+from pathlib import Path
+import json
 
-# 2. Update requirements.txt – skip if already at safe version
-with open("requirements.txt", "r+", encoding="utf-8") as f:
-    text = f.read()
-    if f"{pkg}=={safe}" in text:
-        print(f"{pkg} is already at {safe} – skipping")
-        continue  # go to the next alert (or end)
-    text = re.sub(rf"{pkg}==[0-9A-Za-z.\-]+", f"{pkg}=={safe}", text)
-    f.seek(0); f.write(text); f.truncate()
+# 2. Update the right manifest
+path = Path(manifest)  # e.g. "examples/celery/requirements.txt" or "package.json"
+
+if not path.exists():
+    print(f"⚠️  Manifest {manifest!r} not found, skipping")
+    continue
+
+if manifest.endswith(".txt"):
+    # pip‐style requirements
+    with path.open("r+", encoding="utf-8") as f:
+        text = f.read()
+        text = re.sub(rf"{pkg}==[0-9A-Za-z.\-]+", f"{pkg}=={safe}", text)
+        f.seek(0); f.write(text); f.truncate()
+
+elif manifest.endswith(".json"):
+    # npm‐style package.json
+    data = json.loads(path.read_text(encoding="utf-8"))
+    changed = False
+    for section in ("dependencies", "devDependencies"):
+        if section in data and pkg in data[section]:
+            data[section][pkg] = safe
+            changed = True
+    if not changed:
+        print(f"⚠️  {pkg} not found in {manifest}, skipping")
+        continue
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+else:
+    # other types (e.g. pyproject.toml) could go here later
+    print(f"⚠️  Unknown manifest type: {manifest}, skipping")
+    continue
 
 
 # 3. Commit & push a new branch
