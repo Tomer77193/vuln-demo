@@ -20,9 +20,25 @@ alerts = requests.get(
 if not alerts:
     raise SystemExit("No open Dependabot alerts found")
 
-alert = alerts[0]
-pkg   = alert["dependency"]["package"]["name"]
-adv   = alert["security_advisory"]
+for alert in alerts:
+    pkg = alert["dependency"]["package"]["name"]
+    adv = alert["security_advisory"]
+    
+    # extract the safe version as before
+    safe = extract_safe_version(adv)
+    if not safe:
+        print(f"⚠️  Couldn’t find a patched version for {pkg}, skipping")
+        continue
+
+    print(f"Fixing {pkg} → {safe}")
+    
+    # now run your bump+commit+PR steps *inside* this loop
+    # 1) update requirements.txt
+    # 2) git checkout -b patchbot/{pkg}-{safe}
+    # 3) git config … (the CI identity)
+    # 4) git add/commit/push
+    # 5) create_pull(...)
+
 
 def extract_safe_version(advisory: dict) -> str | None:
     # 1) Preferred: top‑level first_patched_version
