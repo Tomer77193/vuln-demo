@@ -52,11 +52,15 @@ if not safe:
 print(f"Need to bump {pkg} → {safe}")
 # ---------------------------------------------------------------
 
-# 2. Update requirements.txt
+# 2. Update requirements.txt – skip if already at safe version
 with open("requirements.txt", "r+", encoding="utf-8") as f:
     text = f.read()
+    if f"{pkg}=={safe}" in text:
+        print(f"{pkg} is already at {safe} – skipping")
+        continue  # go to the next alert (or end)
     text = re.sub(rf"{pkg}==[0-9A-Za-z.\-]+", f"{pkg}=={safe}", text)
     f.seek(0); f.write(text); f.truncate()
+
 
 # 3. Commit & push a new branch
 branch = f"patchbot/{pkg}-{safe}"
