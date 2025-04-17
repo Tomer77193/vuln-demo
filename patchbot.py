@@ -61,9 +61,20 @@ with open("requirements.txt", "r+", encoding="utf-8") as f:
 # 3. Commit & push a new branch
 branch = f"patchbot/{pkg}-{safe}"
 subprocess.check_call(["git", "checkout", "-B", branch])
+
+# tell Git who the CI bot is  (must be BEFORE the commit)
+subprocess.check_call(["git", "config", "--global",
+                       "user.email", "patchbot@users.noreply.github.com"])
+subprocess.check_call(["git", "config", "--global",
+                       "user.name",  "Patch‑Bot"])
+
 subprocess.check_call(["git", "add", "requirements.txt"])
 subprocess.check_call(["git", "commit", "-m", f"chore: bump {pkg} to {safe}"])
 subprocess.check_call(["git", "push", "-u", "origin", branch])
-
 # 4. Open the pull request
-pr = rep.create_pull
+pr = rep.create_pull(
+    title=f"chore: bump {pkg} to {safe}",
+    body="Automated fix by **Patch‑Bot**",
+    head=branch,
+    base="main"
+)
